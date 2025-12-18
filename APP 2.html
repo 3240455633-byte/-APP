@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AI 智能记账 - 刚需分析版</title>
+    
+    <!-- 安卓 & 华为浏览器 优化标签 -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --safe-area-inset-top: env(safe-area-inset-top);
+        }
+        body {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            padding-top: var(--safe-area-inset-top);
+            scroll-behavior: smooth;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(229, 231, 235, 1);
+        }
+        .active-tap:active {
+            background-color: rgba(0, 0, 0, 0.05);
+            transform: scale(0.97);
+            transition: all 0.1s ease;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .tag-need { background: #fee2e2; color: #ef4444; }
+        .tag-want { background: #fef3c7; color: #d97706; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800 pb-20">
+
+    <div class="max-w-xl mx-auto px-4 pt-6">
+        <!-- Header -->
+        <header class="flex justify-between items-start mb-6">
+            <div>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                    我的记账本
+                </h1>
+                <p id="current-date" class="text-xs text-slate-400 font-medium"></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="openManageModal()" class="p-2 bg-white rounded-full shadow-sm active-tap" title="分类管理">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                </button>
+                <button onclick="exportData()" class="p-2 bg-white rounded-full shadow-sm active-tap" title="导出数据">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Total Assets Card -->
+        <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-3xl p-6 shadow-xl shadow-indigo-200 text-white mb-6">
+            <p class="text-indigo-100 text-xs font-medium uppercase tracking-widest opacity-80">当前结余</p>
+            <h2 id="balance" class="text-4xl font-black mt-1 mb-4">¥ 0.00</h2>
+            <div class="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
+                <div>
+                    <p class="text-indigo-200 text-[10px] uppercase font-bold">本月收入</p>
+                    <p id="total-income" class="text-lg font-bold text-white">¥ 0.00</p>
+                </div>
+                <div class="border-l border-white/10 pl-4">
+                    <p class="text-indigo-200 text-[10px] uppercase font-bold">本月支出</p>
+                    <p id="total-expense" class="text-lg font-bold text-white">¥ 0.00</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="space-y-6">
+            <!-- Add Record Section -->
+            <div class="glass-card p-5 rounded-2xl shadow-sm">
+                <div class="flex p-1 bg-slate-100 rounded-xl mb-4">
+                    <button type="button" onclick="setType('expense')" id="btn-expense" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-indigo-600 transition-all">支出</button>
+                    <button type="button" onclick="setType('income')" id="btn-income" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 transition-all">收入</button>
+                </div>
+
+                <form id="expense-form" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="relative">
+                            <input type="number" id="amount" step="0.01" inputmode="decimal" required
+                                class="w-full pl-4 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-bold" placeholder="金额">
+                        </div>
+                        <select id="category" class="w-full px-3 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm appearance-none font-medium text-slate-600 cursor-pointer">
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="note" class="flex-1 px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="备注内容...">
+                        <button type="submit" class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 active-tap">
+                            记一笔
+                        </button>
+                    </div>
+                    <input type="hidden" id="type" value="expense">
+                </form>
+            </div>
+
+            <!-- Analysis Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-800 rounded-2xl p-4 text-white shadow-lg flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-400">理财助手</span>
+                            <button id="get-ai-advice" class="text-[10px] bg-indigo-500 px-2 py-1 rounded-md active-tap font-bold">分析现状</button>
+                        </div>
+                        <div id="ai-content" class="text-[11px] leading-relaxed text-slate-300 min-h-[40px]">
+                            查看支出结构建议...
+                        </div>
+                    </div>
+                    <div id="loading-spinner" class="hidden flex justify-center py-2">
+                        <div class="animate-spin rounded-full h-4 w-4 border-2 border-slate-500 border-t-white"></div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4 rounded-2xl shadow-sm relative">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">统计视图</span>
+                        <div class="flex bg-slate-100 p-0.5 rounded-md">
+                            <button onclick="changeChartMode('category')" id="mode-cat" class="text-[9px] px-2 py-0.5 rounded bg-white shadow-sm font-bold">分类</button>
+                            <button onclick="changeChartMode('need')" id="mode-need" class="text-[9px] px-2 py-0.5 rounded text-slate-400 font-bold">需求</button>
+                        </div>
+                    </div>
+                    <div class="h-32">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transaction List -->
+            <div>
+                <div class="flex justify-between items-center mb-3 px-1">
+                    <h3 class="text-sm font-bold text-slate-500 italic">账目明细</h3>
+                    <span id="record-count" class="text-[10px] text-slate-400 font-mono">0 笔记录</span>
+                </div>
+                <div id="transaction-list" class="space-y-2">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div id="delete-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[60] px-6">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">确认删除？</h3>
+            <p class="text-sm text-slate-500 mb-6">删除后该笔账目将无法找回。</p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold active-tap">取消</button>
+                <button id="confirm-delete-btn" class="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold active-tap">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分类管理弹窗 -->
+    <div id="manage-modal" class="fixed inset-0 bg-black/60 hidden flex-col z-[50]">
+        <div class="mt-auto bg-white rounded-t-[2.5rem] max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold">分类管理</h3>
+                <button onclick="closeManageModal()" class="text-slate-400 p-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar pb-10">
+                <p class="text-[11px] text-slate-400 mb-4">💡 提示：支出分类可以标记“刚需”或“非刚需”以分析消费质量。</p>
+                
+                <!-- 支出分类编辑 -->
+                <section>
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-red-500 text-sm">支出分类</h4>
+                        <button onclick="addNewCategory('expense')" class="text-xs bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold">+ 新增</button>
+                    </div>
+                    <div id="manage-expense-list" class="space-y-2"></div>
+                </section>
+
+                <!-- 收入分类编辑 -->
+                <section>
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-green-500 text-sm">收入分类</h4>
+                        <button onclick="addNewCategory('income')" class="text-xs bg-green-50 text-green-500 px-3 py-1 rounded-full font-bold">+ 新增</button>
+                    </div>
+                    <div id="manage-income-list" class="space-y-2"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 默认分类数据 (增加了 isNeed 属性)
+        const defaultCategories = {
+            expense: [
+                { name: '餐饮美食', icon: '🍔', color: '#f87171', isNeed: true },
+                { name: '日用百货', icon: '🛍️', color: '#fb923c', isNeed: true },
+                { name: '交通出行', icon: '🚗', color: '#fbbf24', isNeed: true },
+                { name: '休闲娱乐', icon: '🎮', color: '#4ade80', isNeed: false },
+                { name: '医疗保健', icon: '💊', color: '#60a5fa', isNeed: true },
+                { name: '其他支出', icon: '📦', color: '#94a3b8', isNeed: false }
+            ],
+            income: [
+                { name: '工资收入', icon: '💰', color: '#10b981' },
+                { name: '兼职副业', icon: '🧧', color: '#34d399' },
+                { name: '理财收益', icon: '📈', color: '#22d3ee' },
+                { name: '其他收入', icon: '📦', color: '#94a3b8' }
+            ]
+        };
+
+        // 加载分类
+        let categoryData = JSON.parse(localStorage.getItem('my_categories')) || defaultCategories;
+        let transactions = JSON.parse(localStorage.getItem('my_expenses') || '[]');
+        const apiKey = ""; 
+        let chartInstance = null;
+        let deleteId = null;
+        let currentChartMode = 'category'; // 'category' or 'need'
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            document.getElementById('current-date').innerText = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+            updateCategorySelect('expense');
+            initChart();
+            render();
+        });
+
+        // --- 类型切换 ---
+        function setType(type) {
+            document.getElementById('type').value = type;
+            const isExpense = type === 'expense';
+            const btnEx = document.getElementById('btn-expense');
+            const btnIn = document.getElementById('btn-income');
+            
+            if(isExpense) {
+                btnEx.className = "flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-indigo-600 transition-all";
+                btnIn.className = "flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 transition-all";
+            } else {
+                btnIn.className = "flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-green-600 transition-all";
+                btnEx.className = "flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 transition-all";
+            }
+            updateCategorySelect(type);
+        }
+
+        function updateCategorySelect(type) {
+            const select = document.getElementById('category');
+            select.innerHTML = categoryData[type].map(cat => `<option value="${cat.name}">${cat.icon} ${cat.name}</option>`).join('');
+        }
+
+        // --- 图表模式切换 ---
+        function changeChartMode(mode) {
+            currentChartMode = mode;
+            const btnCat = document.getElementById('mode-cat');
+            const btnNeed = document.getElementById('mode-need');
+            if(mode === 'category') {
+                btnCat.className = "text-[9px] px-2 py-0.5 rounded bg-white shadow-sm font-bold";
+                btnNeed.className = "text-[9px] px-2 py-0.5 rounded text-slate-400 font-bold";
+            } else {
+                btnNeed.className = "text-[9px] px-2 py-0.5 rounded bg-white shadow-sm font-bold";
+                btnCat.className = "text-[9px] px-2 py-0.5 rounded text-slate-400 font-bold";
+            }
+            updateChart();
+        }
+
+        // --- 分类管理逻辑 ---
+        function openManageModal() {
+            renderManageLists();
+            document.getElementById('manage-modal').classList.remove('hidden');
+            document.getElementById('manage-modal').classList.add('flex');
+        }
+
+        function closeManageModal() {
+            document.getElementById('manage-modal').classList.add('hidden');
+            document.getElementById('manage-modal').classList.remove('flex');
+            updateCategorySelect(document.getElementById('type').value);
+            render();
+        }
+
+        function renderManageLists() {
+            const expList = document.getElementById('manage-expense-list');
+            const incList = document.getElementById('manage-income-list');
+
+            const createItem = (cat, type, index) => `
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <span class="text-lg">${cat.icon}</span>
+                        <div>
+                           <span class="text-xs font-bold block">${cat.name}</span>
+                           ${type === 'expense' ? `
+                                <button onclick="toggleNeed('${type}', ${index})" class="text-[9px] px-1.5 py-0.5 rounded mt-1 font-bold ${cat.isNeed ? 'bg-red-100 text-red-500' : 'bg-amber-100 text-amber-600'}">
+                                    ${cat.isNeed ? '刚需' : '非刚需'}
+                                </button>
+                           ` : ''}
+                        </div>
+                    </div>
+                    <button onclick="removeCategory('${type}', ${index})" class="text-slate-300 hover:text-red-500 p-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            `;
+
+            expList.innerHTML = categoryData.expense.map((cat, i) => createItem(cat, 'expense', i)).join('');
+            incList.innerHTML = categoryData.income.map((cat, i) => createItem(cat, 'income', i)).join('');
+        }
+
+        function toggleNeed(type, index) {
+            categoryData[type][index].isNeed = !categoryData[type][index].isNeed;
+            saveCategories();
+            renderManageLists();
+        }
+
+        function addNewCategory(type) {
+            const name = prompt("请输入分类名称（如：奶茶）：");
+            if (!name) return;
+            const icon = prompt("请输入 Emoji 图标（如：🍭）：", "✨");
+            const isNeed = type === 'expense' ? confirm("这是刚需支出吗？(点击确定为刚需，取消为非刚需)") : false;
+            const color = type === 'expense' ? '#f87171' : '#10b981';
+
+            categoryData[type].push({ name, icon, color, isNeed });
+            saveCategories();
+            renderManageLists();
+        }
+
+        function removeCategory(type, index) {
+            if (categoryData[type].length <= 1) return;
+            if (confirm("确定删除吗？")) {
+                categoryData[type].splice(index, 1);
+                saveCategories();
+                renderManageLists();
+            }
+        }
+
+        function saveCategories() {
+            localStorage.setItem('my_categories', JSON.stringify(categoryData));
+        }
+
+        // --- 账单记录逻辑 ---
+        document.getElementById('expense-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const amountInput = document.getElementById('amount');
+            const amount = parseFloat(amountInput.value);
+            const type = document.getElementById('type').value;
+            const categoryName = document.getElementById('category').value;
+            const note = document.getElementById('note').value || categoryName;
+            
+            const categoryObj = [...categoryData.expense, ...categoryData.income].find(c => c.name === categoryName);
+
+            const newTransaction = {
+                id: Date.now(),
+                amount: type === 'expense' ? -amount : amount,
+                displayAmount: amount,
+                type,
+                category: categoryName,
+                icon: categoryObj ? categoryObj.icon : '❓',
+                color: categoryObj ? categoryObj.color : '#94a3b8',
+                isNeed: categoryObj ? categoryObj.isNeed : false,
+                note,
+                date: new Date().toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'})
+            };
+
+            transactions.unshift(newTransaction);
+            saveAndRender();
+            e.target.reset();
+            setType('expense');
+        });
+
+        function openDeleteModal(id) {
+            deleteId = id;
+            document.getElementById('delete-modal').classList.replace('hidden', 'flex');
+        }
+
+        function closeDeleteModal() {
+            deleteId = null;
+            document.getElementById('delete-modal').classList.replace('flex', 'hidden');
+        }
+
+        document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+            if(deleteId) {
+                transactions = transactions.filter(t => t.id !== deleteId);
+                saveAndRender();
+                closeDeleteModal();
+            }
+        });
+
+        function saveAndRender() {
+            localStorage.setItem('my_expenses', JSON.stringify(transactions));
+            render();
+        }
+
+        function render() {
+            const expense = Math.abs(transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0));
+            const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+            
+            document.getElementById('total-expense').innerText = `¥ ${expense.toFixed(2)}`;
+            document.getElementById('total-income').innerText = `¥ ${income.toFixed(2)}`;
+            document.getElementById('balance').innerText = `¥ ${(income - expense).toFixed(2)}`;
+            document.getElementById('record-count').innerText = `${transactions.length} 笔记录`;
+
+            const list = document.getElementById('transaction-list');
+            if (transactions.length === 0) {
+                list.innerHTML = `<div class="py-10 text-center text-slate-300 text-xs">暂无明细记录</div>`;
+            } else {
+                list.innerHTML = transactions.map(t => `
+                    <div onclick="openDeleteModal(${t.id})" class="flex items-center justify-between p-3 bg-white rounded-xl active-tap transition-all">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background-color: ${t.color}15">
+                                ${t.icon}
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <p class="text-xs font-bold text-slate-700">${t.note}</p>
+                                    ${t.type === 'expense' ? `<span class="text-[8px] px-1 rounded-sm ${t.isNeed ? 'tag-need' : 'tag-want'}">${t.isNeed ? '刚需' : '非刚需'}</span>` : ''}
+                                </div>
+                                <p class="text-[10px] text-slate-400">${t.date} · ${t.category}</p>
+                            </div>
+                        </div>
+                        <p class="font-bold text-sm ${t.type === 'expense' ? 'text-slate-700' : 'text-green-500'}">
+                            ${t.type === 'expense' ? '-' : '+'}${t.displayAmount.toFixed(2)}
+                        </p>
+                    </div>
+                `).join('');
+            }
+            updateChart();
+        }
+
+        // --- 图表分析 ---
+        function initChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0 }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateChart() {
+            const expenseData = transactions.filter(t => t.type === 'expense');
+            const dataMap = {};
+            
+            if (currentChartMode === 'category') {
+                expenseData.forEach(t => {
+                    if(!dataMap[t.category]) {
+                        const catInfo = categoryData.expense.find(c => c.name === t.category);
+                        dataMap[t.category] = { amount: 0, color: catInfo ? catInfo.color : '#cbd5e1' };
+                    }
+                    dataMap[t.category].amount += t.displayAmount;
+                });
+            } else {
+                // 刚需 vs 非刚需
+                dataMap['刚需'] = { amount: 0, color: '#ef4444' };
+                dataMap['非刚需'] = { amount: 0, color: '#f59e0b' };
+                expenseData.forEach(t => {
+                    const label = t.isNeed ? '刚需' : '非刚需';
+                    dataMap[label].amount += t.displayAmount;
+                });
+            }
+
+            chartInstance.data.labels = Object.keys(dataMap);
+            chartInstance.data.datasets[0].data = Object.values(dataMap).map(v => v.amount);
+            chartInstance.data.datasets[0].backgroundColor = Object.values(dataMap).map(v => v.color);
+            chartInstance.update();
+        }
+
+        // --- 功能 ---
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+                expenses: transactions,
+                categories: categoryData
+            }));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `财务报告_${new Date().toLocaleDateString()}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        document.getElementById('get-ai-advice').addEventListener('click', async () => {
+            const contentDiv = document.getElementById('ai-content');
+            const spinner = document.getElementById('loading-spinner');
+            const expenses = transactions.filter(t => t.type === 'expense');
+            if (expenses.length === 0) return;
+
+            contentDiv.classList.add('hidden');
+            spinner.classList.remove('hidden');
+
+            const needTotal = expenses.filter(t => t.isNeed).reduce((s, t) => s + t.displayAmount, 0);
+            const wantTotal = expenses.filter(t => !t.isNeed).reduce((s, t) => s + t.displayAmount, 0);
+
+            const prompt = `总支出中，刚需 ¥${needTotal.toFixed(2)}，非刚需 ¥${wantTotal.toFixed(2)}。请根据 50/30/20 法则给出一个犀利的省钱分析建议，30字以内。`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: { parts: [{ text: "你是财务专家，重点分析非刚需支出的合理性。" }] }
+                    })
+                });
+                const result = await response.json();
+                contentDiv.innerText = result.candidates?.[0]?.content?.parts?.[0]?.text || "暂无建议。";
+            } catch (error) {
+                contentDiv.innerText = "分析请求失败。";
+            } finally {
+                spinner.classList.add('hidden');
+                contentDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
